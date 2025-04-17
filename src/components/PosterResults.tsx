@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { PosterTaskResult, downloadImage } from "@/services/posterService";
 import { Button } from "@/components/ui/button";
-import { Download, CheckCircle, AlertCircle } from "lucide-react";
+import { Download, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 interface PosterResultsProps {
@@ -14,11 +14,22 @@ interface PosterResultsProps {
 const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => {
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     // Reset selected images when task result changes
     setSelectedImages([]);
     setImageErrors({});
+    setLoadingImages({});
+    
+    // Set initial loading state for all images
+    if (taskResult?.render_urls) {
+      const initialLoadingState: Record<string, boolean> = {};
+      taskResult.render_urls.forEach(url => {
+        initialLoadingState[url] = true;
+      });
+      setLoadingImages(initialLoadingState);
+    }
   }, [taskResult]);
 
   const toggleImageSelection = (imageUrl: string) => {
@@ -39,6 +50,8 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
 
     // Download all selected images
     let successCount = 0;
+    let errorCount = 0;
+    
     for (let i = 0; i < selectedImages.length; i++) {
       try {
         const imageUrl = selectedImages[i];
@@ -47,22 +60,44 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
         successCount++;
       } catch (err) {
         console.error("Download error:", err);
+        errorCount++;
         // Continue with other downloads even if one fails
       }
     }
 
     if (successCount > 0) {
-      toast.success(`成功下载 ${successCount} 张图片`);
+      toast.success(`成功下载 ${successCount} 张图片${errorCount > 0 ? `，${errorCount} 张下载失败` : ''}`);
     } else {
       toast.error("所有图片下载失败，请重试");
     }
   };
 
+  // Function to handle image load completion
+  const handleImageLoaded = (imageUrl: string) => {
+    setLoadingImages(prev => ({ ...prev, [imageUrl]: false }));
+  };
+
   // Function to handle image errors
   const handleImageError = (imageUrl: string) => {
     setImageErrors(prev => ({ ...prev, [imageUrl]: true }));
-    // Don't show toast for every image error to avoid overwhelming the user
+    setLoadingImages(prev => ({ ...prev, [imageUrl]: false }));
     console.error(`图片加载失败: ${imageUrl}`);
+  };
+
+  // Function to retry loading an image
+  const retryImageLoad = (imageUrl: string) => {
+    setImageErrors(prev => ({ ...prev, [imageUrl]: false }));
+    setLoadingImages(prev => ({ ...prev, [imageUrl]: true }));
+    
+    // Force browser to reload the image by appending a timestamp
+    const timestampedUrl = imageUrl.includes('?') 
+      ? `${imageUrl}&t=${Date.now()}` 
+      : `${imageUrl}?t=${Date.now()}`;
+    
+    const img = new Image();
+    img.onload = () => handleImageLoaded(imageUrl);
+    img.onerror = () => handleImageError(imageUrl);
+    img.src = timestampedUrl;
   };
 
   // Local fallback image that's guaranteed to exist
@@ -118,36 +153,63 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
               ${selectedImages.includes(imageUrl) 
                 ? 'border-theme-blue shadow-lg shadow-theme-blue/20' 
                 : 'border-dark-3 hover:border-dark-1'}`}
-            onClick={() => toggleImageSelection(imageUrl)}
+            onClick={() => !imageErrors[imageUrl] && toggleImageSelection(imageUrl)}
           >
             {/* Use a more reliable image display approach with error handling */}
             {imageErrors[imageUrl] ? (
               <div className="w-full aspect-[3/4] bg-gray-200 flex flex-col items-center justify-center p-4 text-center">
                 <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
                 <p className="text-sm text-gray-600">图片加载失败</p>
-                <p className="text-xs text-gray-500 mt-1 break-all">请重新生成</p>
+                <Button 
+                  variant="outline" 
+                  className="mt-3"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    retryImageLoad(imageUrl);
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                  重试
+                </Button>
               </div>
             ) : (
-              <img 
-                src={imageUrl} 
-                alt={`海报 ${index + 1}`} 
-                className="w-full object-cover aspect-[3/4]" 
-                onError={() => handleImageError(imageUrl)}
-              />
+              <div className="relative w-full aspect-[3/4]">
+                {loadingImages[imageUrl] && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
+                    <div className="loading-spinner"></div>
+                  </div>
+                )}
+                <img 
+                  src={imageUrl} 
+                  alt={`海报 ${index + 1}`} 
+                  className="w-full h-full object-cover" 
+                  onLoad={() => handleImageLoaded(imageUrl)}
+                  onError={() => handleImageError(imageUrl)}
+                  style={{
+                    opacity: loadingImages[imageUrl] ? 0 : 1,
+                    transition: 'opacity 0.3s ease'
+                  }}
+                />
+              </div>
             )}
             
-            {selectedImages.includes(imageUrl) && (
+            {selectedImages.includes(imageUrl) && !imageErrors[imageUrl] && (
               <div className="absolute top-3 right-3">
                 <CheckCircle className="w-6 h-6 text-theme-blue" fill="rgba(29, 58, 255, 0.2)" />
               </div>
             )}
             
             <div className="absolute bottom-0 left-0 right-0 bg-dark-7/80 py-2 px-3 flex justify-between items-center">
-              <p className="text-sm text-bright-3">点击选择</p>
-              {/* Show selection status */}
-              <p className="text-xs text-bright-5">
-                {selectedImages.includes(imageUrl) ? '已选择' : '未选择'}
+              <p className="text-sm text-bright-3">
+                {imageErrors[imageUrl] ? '图片加载失败' : '点击选择'}
               </p>
+              {/* Show selection status */}
+              {!imageErrors[imageUrl] && (
+                <p className="text-xs text-bright-5">
+                  {selectedImages.includes(imageUrl) ? '已选择' : '未选择'}
+                </p>
+              )}
             </div>
           </div>
         ))}

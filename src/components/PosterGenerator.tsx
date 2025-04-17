@@ -21,6 +21,7 @@ const PosterGenerator = () => {
   const [isFirstGeneration, setIsFirstGeneration] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectivityError, setConnectivityError] = useState<string | null>(null);
+  const [pollingId, setPollingId] = useState<number | null>(null);
 
   useEffect(() => {
     // Check if API key is already set
@@ -31,13 +32,20 @@ const PosterGenerator = () => {
 
     // Check connectivity to Alipay CDN
     checkConnectivity();
-  }, []);
+    
+    // Cleanup polling on component unmount
+    return () => {
+      if (pollingId !== null) {
+        clearTimeout(pollingId);
+      }
+    };
+  }, [pollingId]);
 
   // Function to check if external resources can be loaded
   const checkConnectivity = async () => {
     try {
       const testUrl = "https://mdn.alipayobjects.com/huamei_rcfvwt/afts/img/A*NZuwQp_vcH0AAAAAAAAAAAAADtmcAQ/fmt.webp";
-      const response = await fetch(testUrl, { method: 'HEAD', mode: 'no-cors' });
+      await fetch(testUrl, { method: 'HEAD', mode: 'no-cors' });
       
       // If we get here, the resource is likely accessible
       setConnectivityError(null);
@@ -56,7 +64,7 @@ const PosterGenerator = () => {
     setError(null);
     
     try {
-      // Create a task
+      // Create a task using the API
       const taskResponse = await createPosterTask(params);
       
       if (taskResponse.task_id) {
@@ -75,12 +83,19 @@ const PosterGenerator = () => {
 
   const pollTaskResult = async (taskId: string) => {
     let retryCount = 0;
-    const maxRetries = 10;
+    const maxRetries = 30; // Increased for longer running tasks
     const pollInterval = 3000; // 3 seconds
     
     const poll = async () => {
+      if (retryCount >= maxRetries) {
+        toast.error("获取海报结果超时，请重试");
+        setIsSubmitting(false);
+        setError("获取海报结果超时");
+        return;
+      }
+      
       try {
-        // Get the task result
+        // Get the task result from the API
         const result = await getPosterTaskResult(taskId);
         
         if (result.task_status === "SUCCEEDED") {
@@ -96,16 +111,11 @@ const PosterGenerator = () => {
           toast.error(`生成海报失败: ${result.message || "任务执行失败"}`);
           setIsSubmitting(false);
           setError(result.message || "任务执行失败");
-        } else if (["PENDING", "RUNNING"].includes(result.task_status)) {
-          // Task is still running, poll again after a delay if we haven't exceeded max retries
-          if (retryCount < maxRetries) {
-            retryCount++;
-            setTimeout(poll, pollInterval);
-          } else {
-            toast.error("获取海报结果超时，请重试");
-            setIsSubmitting(false);
-            setError("获取海报结果超时");
-          }
+        } else if (["PENDING", "RUNNING", "SUSPENDED"].includes(result.task_status)) {
+          // Task is still running, poll again after a delay
+          retryCount++;
+          const timeoutId = setTimeout(poll, pollInterval);
+          setPollingId(Number(timeoutId));
         } else {
           // Handle unexpected status
           toast.error(`生成海报失败: 未预期的任务状态 ${result.task_status}`);
@@ -114,9 +124,17 @@ const PosterGenerator = () => {
         }
       } catch (error) {
         console.error("Error polling task result:", error);
-        toast.error(`获取海报结果失败: ${error instanceof Error ? error.message : "未知错误"}`);
-        setIsSubmitting(false);
-        setError(error instanceof Error ? error.message : "未知错误");
+        
+        // Don't immediately fail - retry a few times first
+        if (retryCount < 3) {
+          retryCount++;
+          const timeoutId = setTimeout(poll, pollInterval);
+          setPollingId(Number(timeoutId));
+        } else {
+          toast.error(`获取海报结果失败: ${error instanceof Error ? error.message : "未知错误"}`);
+          setIsSubmitting(false);
+          setError(error instanceof Error ? error.message : "未知错误");
+        }
       }
     };
     

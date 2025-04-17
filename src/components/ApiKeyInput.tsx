@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getPosterApiKey, setPosterApiKey } from "@/services/posterService";
@@ -12,6 +12,14 @@ interface ApiKeyInputProps {
 const ApiKeyInput = ({ onApiKeySet }: ApiKeyInputProps) => {
   const [apiKey, setApiKey] = useState("");
   const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    // Check if API key is already in localStorage
+    const savedKey = getPosterApiKey();
+    if (savedKey) {
+      setApiKey(savedKey);
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

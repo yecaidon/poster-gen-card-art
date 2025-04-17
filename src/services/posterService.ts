@@ -41,16 +41,33 @@ let apiKey = "";
 
 export const setPosterApiKey = (key: string) => {
   apiKey = key;
+  // Also store in localStorage for persistence
+  try {
+    localStorage.setItem("posterApiKey", key);
+  } catch (error) {
+    console.error("Failed to store API key in localStorage:", error);
+  }
 };
 
 export const getPosterApiKey = () => {
+  // Try to retrieve from localStorage if not in memory
+  if (!apiKey) {
+    try {
+      const storedKey = localStorage.getItem("posterApiKey");
+      if (storedKey) {
+        apiKey = storedKey;
+      }
+    } catch (error) {
+      console.error("Failed to retrieve API key from localStorage:", error);
+    }
+  }
   return apiKey;
 };
 
 // Environment detection
 const isDevelopment = import.meta.env.DEV;
 
-// Function to create a poster generation task
+// Function to create a poster generation task based on Alibaba Cloud API
 export const createPosterTask = async (
   params: PosterGenerationParams
 ): Promise<PosterGenerationResponse> => {
@@ -72,7 +89,8 @@ export const createPosterTask = async (
         task_status: "PENDING"
       };
     } else {
-      // Real API call for production
+      // Real API call to Alibaba Cloud for production
+      // This follows the example curl request format exactly
       const response = await fetch(
         "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis",
         {
@@ -80,7 +98,7 @@ export const createPosterTask = async (
           headers: {
             "X-DashScope-Async": "enable",
             "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
+            "Authorization": `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
             model: "wanx-poster-generation-v1",
@@ -92,11 +110,22 @@ export const createPosterTask = async (
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create poster task");
+        console.error("API error response:", errorData);
+        throw new Error(errorData.message || `请求失败: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      return data.output;
+      // The Alibaba Cloud API returns a response with an output field containing the task info
+      console.log("API response:", data);
+      
+      if (data.output?.task_id) {
+        return {
+          task_id: data.output.task_id,
+          task_status: data.output.task_status || "PENDING"
+        };
+      } else {
+        throw new Error("API 响应中缺少任务 ID");
+      }
     }
   } catch (error) {
     console.error("Error creating poster task:", error);
@@ -105,7 +134,7 @@ export const createPosterTask = async (
   }
 };
 
-// Function to query the task result
+// Function to query the task result based on Alibaba Cloud API
 export const getPosterTaskResult = async (
   taskId: string
 ): Promise<PosterTaskResult> => {
@@ -123,9 +152,9 @@ export const getPosterTaskResult = async (
       
       // Use reliable local images that won't fail to load
       const mockImages = [
-        "/lovable-uploads/a2db5cbb-2a6a-4eba-90ca-520fec9edaac.png", // The error image you uploaded
-        "/placeholder.svg", // This is part of the project
-        "/favicon.ico" // This is part of the project
+        "/lovable-uploads/a2db5cbb-2a6a-4eba-90ca-520fec9edaac.png", 
+        "/placeholder.svg", 
+        "/favicon.ico" 
       ];
       
       // Number of images to return based on generate_num
@@ -143,24 +172,32 @@ export const getPosterTaskResult = async (
         end_time: new Date().toISOString(),
       };
     } else {
-      // Real API call for production
+      // Real API call for production - exactly following the example
       const response = await fetch(
         `https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`,
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${apiKey}`,
+            "Authorization": `Bearer ${apiKey}`,
           },
         }
       );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to get poster task result");
+        console.error("API error response:", errorData);
+        throw new Error(errorData.message || `请求失败: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      return data.output;
+      console.log("Task result API response:", data);
+      
+      // The Alibaba Cloud API returns a response with an output field containing the result
+      if (data.output) {
+        return data.output;
+      } else {
+        throw new Error("API 响应中缺少输出数据");
+      }
     }
   } catch (error) {
     console.error("Error getting poster task result:", error);
@@ -172,21 +209,33 @@ export const getPosterTaskResult = async (
 // Function to download an image
 export const downloadImage = async (imageUrl: string, fileName: string) => {
   try {
+    console.log("Downloading image:", imageUrl);
+    
     // Special handling for local development resources
     if (imageUrl.startsWith('/')) {
       const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.download = fileName;
+      document.body.appendChild(link); // This is important for Firefox
       link.click();
+      document.body.removeChild(link); // Clean up
       window.URL.revokeObjectURL(url);
       return;
     }
     
-    // Regular image download procedure
-    const response = await fetch(imageUrl);
+    // Regular image download procedure for remote URLs
+    const response = await fetch(imageUrl, { 
+      mode: 'cors',
+      cache: 'no-cache',
+    });
+    
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -196,11 +245,15 @@ export const downloadImage = async (imageUrl: string, fileName: string) => {
     const link = document.createElement("a");
     link.href = url;
     link.download = fileName;
+    document.body.appendChild(link); // This is important for Firefox
     link.click();
+    document.body.removeChild(link); // Clean up
     window.URL.revokeObjectURL(url);
+    
+    toast.success(`图片 ${fileName} 下载成功`);
   } catch (error) {
     console.error("Error downloading image:", error);
     toast.error(`下载图片失败: ${error instanceof Error ? error.message : "未知错误"}`);
-    throw error; // Rethrow so the calling function can handle it
+    throw error;
   }
 };

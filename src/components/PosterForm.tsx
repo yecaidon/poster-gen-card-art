@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -150,8 +149,8 @@ const PosterForm = ({ onSubmit, isSubmitting, isFirstGeneration }: PosterFormPro
       <div className="space-y-2">
         <Label htmlFor="lora_name" className="form-label">海报风格</Label>
         <Select
-          value={formState.lora_name}
-          onValueChange={value => handleChange("lora_name", value)}
+          value={formState.lora_name || "none"}
+          onValueChange={value => handleChange("lora_name", value === "none" ? undefined : value)}
           disabled={isSubmitting}
         >
           <SelectTrigger className="bg-dark-3 border-dark-1">
@@ -170,14 +169,14 @@ const PosterForm = ({ onSubmit, isSubmitting, isFirstGeneration }: PosterFormPro
       <div className="space-y-2">
         <div className="flex justify-between items-center">
           <Label htmlFor="lora_weight" className="form-label">风格权重</Label>
-          <span className="text-xs text-bright-5">{formState.lora_weight.toFixed(1)}</span>
+          <span className="text-xs text-bright-5">{formState.lora_weight?.toFixed(1) || "0.8"}</span>
         </div>
         <Slider
           id="lora_weight"
           min={0}
           max={1}
           step={0.1}
-          value={[formState.lora_weight]}
+          value={[formState.lora_weight || 0.8]}
           onValueChange={value => handleChange("lora_weight", value[0])}
           disabled={isSubmitting}
           className="my-5"
@@ -187,14 +186,14 @@ const PosterForm = ({ onSubmit, isSubmitting, isFirstGeneration }: PosterFormPro
       <div className="space-y-2">
         <div className="flex justify-between items-center">
           <Label htmlFor="ctrl_ratio" className="form-label">留白效果权重</Label>
-          <span className="text-xs text-bright-5">{formState.ctrl_ratio.toFixed(1)}</span>
+          <span className="text-xs text-bright-5">{formState.ctrl_ratio?.toFixed(1) || "0.7"}</span>
         </div>
         <Slider
           id="ctrl_ratio"
           min={0}
           max={1}
           step={0.1}
-          value={[formState.ctrl_ratio]}
+          value={[formState.ctrl_ratio || 0.7]}
           onValueChange={value => handleChange("ctrl_ratio", value[0])}
           disabled={isSubmitting}
           className="my-5"
@@ -204,14 +203,14 @@ const PosterForm = ({ onSubmit, isSubmitting, isFirstGeneration }: PosterFormPro
       <div className="space-y-2">
         <div className="flex justify-between items-center">
           <Label htmlFor="ctrl_step" className="form-label">留白步数比例</Label>
-          <span className="text-xs text-bright-5">{formState.ctrl_step.toFixed(1)}</span>
+          <span className="text-xs text-bright-5">{formState.ctrl_step?.toFixed(1) || "0.7"}</span>
         </div>
         <Slider
           id="ctrl_step"
           min={0.1}
           max={1}
           step={0.1}
-          value={[formState.ctrl_step]}
+          value={[formState.ctrl_step || 0.7]}
           onValueChange={value => handleChange("ctrl_step", value[0])}
           disabled={isSubmitting}
           className="my-5"
@@ -221,7 +220,7 @@ const PosterForm = ({ onSubmit, isSubmitting, isFirstGeneration }: PosterFormPro
       <div className="space-y-2">
         <Label htmlFor="generate_num" className="form-label">生成数量</Label>
         <Select
-          value={formState.generate_num?.toString()}
+          value={formState.generate_num?.toString() || "2"}
           onValueChange={value => handleChange("generate_num", parseInt(value))}
           disabled={isSubmitting}
         >
@@ -251,7 +250,7 @@ const PosterForm = ({ onSubmit, isSubmitting, isFirstGeneration }: PosterFormPro
           <>
             {isFirstGeneration ? "开始生成" : (
               <>
-                <RefreshCcw className="w-4 h-4" />
+                <RefreshCcw className="w-4 h-4 mr-2" />
                 <span>继续生成</span>
               </>
             )}
