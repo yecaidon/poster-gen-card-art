@@ -121,16 +121,15 @@ export const getPosterTaskResult = async (
       // Simulate a delay
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // More realistic mock poster images for development
+      // Use reliable local images that won't fail to load
       const mockImages = [
-        "public/lovable-uploads/68774201-56a6-4560-8d5b-e4169087d914.png",
-        "https://mdn.alipayobjects.com/huamei_rcfvwt/afts/img/A*U3IxS6d_gAMAAAAAAAAAAAAADtmcAQ/fmt.webp",
-        "https://mdn.alipayobjects.com/huamei_rcfvwt/afts/img/A*QHM8RI_TIxMAAAAAAAAAAAAADtmcAQ/fmt.webp",
-        "https://mdn.alipayobjects.com/huamei_rcfvwt/afts/img/A*HkP0SpPpxycAAAAAAAAAAAAADtmcAQ/fmt.webp",
+        "/lovable-uploads/a2db5cbb-2a6a-4eba-90ca-520fec9edaac.png", // The error image you uploaded
+        "/placeholder.svg", // This is part of the project
+        "/favicon.ico" // This is part of the project
       ];
       
       // Number of images to return based on generate_num
-      const numImages = Math.min(4, Math.max(1, Math.floor(Math.random() * 4) + 1));
+      const numImages = Math.min(3, Math.max(1, Math.floor(Math.random() * 3) + 1));
       
       // Return mock results
       return {
@@ -173,7 +172,25 @@ export const getPosterTaskResult = async (
 // Function to download an image
 export const downloadImage = async (imageUrl: string, fileName: string) => {
   try {
+    // Special handling for local development resources
+    if (imageUrl.startsWith('/')) {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      window.URL.revokeObjectURL(url);
+      return;
+    }
+    
+    // Regular image download procedure
     const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -184,5 +201,6 @@ export const downloadImage = async (imageUrl: string, fileName: string) => {
   } catch (error) {
     console.error("Error downloading image:", error);
     toast.error(`下载图片失败: ${error instanceof Error ? error.message : "未知错误"}`);
+    throw error; // Rethrow so the calling function can handle it
   }
 };

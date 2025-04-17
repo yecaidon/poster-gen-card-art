@@ -11,6 +11,8 @@ import {
   getPosterApiKey
 } from "@/services/posterService";
 import { toast } from "sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const PosterGenerator = () => {
   const [isApiKeySet, setIsApiKeySet] = useState(false);
@@ -18,6 +20,7 @@ const PosterGenerator = () => {
   const [taskResult, setTaskResult] = useState<PosterTaskResult | null>(null);
   const [isFirstGeneration, setIsFirstGeneration] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [connectivityError, setConnectivityError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if API key is already set
@@ -25,7 +28,24 @@ const PosterGenerator = () => {
     if (apiKey) {
       setIsApiKeySet(true);
     }
+
+    // Check connectivity to Alipay CDN
+    checkConnectivity();
   }, []);
+
+  // Function to check if external resources can be loaded
+  const checkConnectivity = async () => {
+    try {
+      const testUrl = "https://mdn.alipayobjects.com/huamei_rcfvwt/afts/img/A*NZuwQp_vcH0AAAAAAAAAAAAADtmcAQ/fmt.webp";
+      const response = await fetch(testUrl, { method: 'HEAD', mode: 'no-cors' });
+      
+      // If we get here, the resource is likely accessible
+      setConnectivityError(null);
+    } catch (err) {
+      console.error("Connectivity test failed:", err);
+      setConnectivityError("检测到外部资源加载问题，可能影响海报展示。请确保您的网络可以访问阿里云资源。");
+    }
+  };
 
   const handleApiKeySet = () => {
     setIsApiKeySet(true);
@@ -111,6 +131,12 @@ const PosterGenerator = () => {
     <div className="split-panel">
       <div className="form-panel">
         <h1 className="text-2xl font-bold mb-6">AI 海报生成器</h1>
+        {connectivityError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{connectivityError}</AlertDescription>
+          </Alert>
+        )}
         <PosterForm 
           onSubmit={handleSubmit} 
           isSubmitting={isSubmitting}

@@ -13,10 +13,12 @@ interface PosterResultsProps {
 
 const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => {
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     // Reset selected images when task result changes
     setSelectedImages([]);
+    setImageErrors({});
   }, [taskResult]);
 
   const toggleImageSelection = (imageUrl: string) => {
@@ -36,14 +38,35 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
     }
 
     // Download all selected images
+    let successCount = 0;
     for (let i = 0; i < selectedImages.length; i++) {
-      const imageUrl = selectedImages[i];
-      const fileName = `poster-${i + 1}-${new Date().getTime()}.jpg`;
-      await downloadImage(imageUrl, fileName);
+      try {
+        const imageUrl = selectedImages[i];
+        const fileName = `poster-${i + 1}-${new Date().getTime()}.jpg`;
+        await downloadImage(imageUrl, fileName);
+        successCount++;
+      } catch (err) {
+        console.error("Download error:", err);
+        // Continue with other downloads even if one fails
+      }
     }
 
-    toast.success(`成功下载 ${selectedImages.length} 张图片`);
+    if (successCount > 0) {
+      toast.success(`成功下载 ${successCount} 张图片`);
+    } else {
+      toast.error("所有图片下载失败，请重试");
+    }
   };
+
+  // Function to handle image errors
+  const handleImageError = (imageUrl: string) => {
+    setImageErrors(prev => ({ ...prev, [imageUrl]: true }));
+    // Don't show toast for every image error to avoid overwhelming the user
+    console.error(`图片加载失败: ${imageUrl}`);
+  };
+
+  // Local fallback image that's guaranteed to exist
+  const fallbackImage = "/lovable-uploads/a2db5cbb-2a6a-4eba-90ca-520fec9edaac.png";
 
   if (isLoading) {
     return (
@@ -97,18 +120,21 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
                 : 'border-dark-3 hover:border-dark-1'}`}
             onClick={() => toggleImageSelection(imageUrl)}
           >
-            <img 
-              src={imageUrl} 
-              alt={`海报 ${index + 1}`} 
-              className="w-full object-cover aspect-[3/4]" 
-              onError={(e) => {
-                // Handle image loading errors
-                const target = e.target as HTMLImageElement;
-                target.onerror = null; // Prevent infinite loops
-                target.src = "https://mdn.alipayobjects.com/huamei_rcfvwt/afts/img/A*NZuwQp_vcH0AAAAAAAAAAAAADtmcAQ/fmt.webp"; // Fallback image
-                toast.error(`图片加载失败: ${imageUrl}`);
-              }}
-            />
+            {/* Use a more reliable image display approach with error handling */}
+            {imageErrors[imageUrl] ? (
+              <div className="w-full aspect-[3/4] bg-gray-200 flex flex-col items-center justify-center p-4 text-center">
+                <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
+                <p className="text-sm text-gray-600">图片加载失败</p>
+                <p className="text-xs text-gray-500 mt-1 break-all">请重新生成</p>
+              </div>
+            ) : (
+              <img 
+                src={imageUrl} 
+                alt={`海报 ${index + 1}`} 
+                className="w-full object-cover aspect-[3/4]" 
+                onError={() => handleImageError(imageUrl)}
+              />
+            )}
             
             {selectedImages.includes(imageUrl) && (
               <div className="absolute top-3 right-3">
