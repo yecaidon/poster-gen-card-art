@@ -17,6 +17,7 @@ const PosterGenerator = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [taskResult, setTaskResult] = useState<PosterTaskResult | null>(null);
   const [isFirstGeneration, setIsFirstGeneration] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if API key is already set
@@ -32,42 +33,74 @@ const PosterGenerator = () => {
 
   const handleSubmit = async (params: PosterGenerationParams) => {
     setIsSubmitting(true);
+    setError(null);
     
     try {
       // Create a task
       const taskResponse = await createPosterTask(params);
       
-      // Start polling for the task result
-      pollTaskResult(taskResponse.task_id);
+      if (taskResponse.task_id) {
+        // Start polling for the task result
+        pollTaskResult(taskResponse.task_id);
+      } else {
+        throw new Error("未获取到任务ID");
+      }
     } catch (error) {
       console.error("Error submitting form:", error);
       toast.error(`生成海报失败: ${error instanceof Error ? error.message : "未知错误"}`);
       setIsSubmitting(false);
+      setError(error instanceof Error ? error.message : "未知错误");
     }
   };
 
   const pollTaskResult = async (taskId: string) => {
-    try {
-      // Get the task result
-      const result = await getPosterTaskResult(taskId);
-      
-      if (result.task_status === "SUCCEEDED") {
-        setTaskResult(result);
+    let retryCount = 0;
+    const maxRetries = 10;
+    const pollInterval = 3000; // 3 seconds
+    
+    const poll = async () => {
+      try {
+        // Get the task result
+        const result = await getPosterTaskResult(taskId);
+        
+        if (result.task_status === "SUCCEEDED") {
+          if (result.render_urls && result.render_urls.length > 0) {
+            setTaskResult(result);
+            setIsSubmitting(false);
+            setIsFirstGeneration(false);
+            toast.success("海报生成成功");
+          } else {
+            throw new Error("没有返回图片数据");
+          }
+        } else if (result.task_status === "FAILED") {
+          toast.error(`生成海报失败: ${result.message || "任务执行失败"}`);
+          setIsSubmitting(false);
+          setError(result.message || "任务执行失败");
+        } else if (["PENDING", "RUNNING"].includes(result.task_status)) {
+          // Task is still running, poll again after a delay if we haven't exceeded max retries
+          if (retryCount < maxRetries) {
+            retryCount++;
+            setTimeout(poll, pollInterval);
+          } else {
+            toast.error("获取海报结果超时，请重试");
+            setIsSubmitting(false);
+            setError("获取海报结果超时");
+          }
+        } else {
+          // Handle unexpected status
+          toast.error(`生成海报失败: 未预期的任务状态 ${result.task_status}`);
+          setIsSubmitting(false);
+          setError(`未预期的任务状态: ${result.task_status}`);
+        }
+      } catch (error) {
+        console.error("Error polling task result:", error);
+        toast.error(`获取海报结果失败: ${error instanceof Error ? error.message : "未知错误"}`);
         setIsSubmitting(false);
-        setIsFirstGeneration(false);
-        toast.success("海报生成成功");
-      } else if (result.task_status === "FAILED") {
-        toast.error(`生成海报失败: ${result.message || "任务执行失败"}`);
-        setIsSubmitting(false);
-      } else {
-        // Task is still running, poll again after a delay
-        setTimeout(() => pollTaskResult(taskId), 3000);
+        setError(error instanceof Error ? error.message : "未知错误");
       }
-    } catch (error) {
-      console.error("Error polling task result:", error);
-      toast.error(`获取海报结果失败: ${error instanceof Error ? error.message : "未知错误"}`);
-      setIsSubmitting(false);
-    }
+    };
+    
+    poll();
   };
 
   if (!isApiKeySet) {
@@ -88,6 +121,7 @@ const PosterGenerator = () => {
         <PosterResults 
           taskResult={taskResult} 
           isLoading={isSubmitting} 
+          error={error}
         />
       </div>
     </div>
