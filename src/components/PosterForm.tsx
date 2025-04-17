@@ -16,7 +16,7 @@ interface PosterFormProps {
 }
 
 const LORA_STYLES = [
-  { value: "", label: "无风格" },
+  { value: "none", label: "无风格" },
   { value: "2D插画1", label: "2D插画1" },
   { value: "2D插画2", label: "2D插画2" },
   { value: "浩瀚星云", label: "浩瀚星云" },
