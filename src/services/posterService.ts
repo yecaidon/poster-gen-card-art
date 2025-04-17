@@ -1,5 +1,6 @@
 
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 // Types for our poster generation API
 export interface PosterGenerationParams {
@@ -67,7 +68,7 @@ export const getPosterApiKey = () => {
 // Environment detection
 const isDevelopment = import.meta.env.DEV;
 
-// Function to create a poster generation task based on Alibaba Cloud API
+// Function to create a poster generation task using our Supabase Edge Function
 export const createPosterTask = async (
   params: PosterGenerationParams
 ): Promise<PosterGenerationResponse> => {
@@ -90,87 +91,40 @@ export const createPosterTask = async (
         task_status: "PENDING"
       };
     } else {
-      // Real API call to Alibaba Cloud for production
-      console.log("Production mode: Calling Alibaba Cloud API");
+      // Call our Supabase Edge Function
+      console.log("Production mode: Calling Edge Function to create poster task");
       
-      const requestBody = {
-        model: "wanx-poster-generation-v1",
-        input: params,
-        parameters: {}
-      };
+      const { data, error } = await supabase.functions.invoke('poster-generation', {
+        body: {
+          apiKey,
+          params
+        }
+      });
       
-      console.log("API Request body:", JSON.stringify(requestBody, null, 2));
+      console.log("Edge Function response:", data);
       
-      // 在前端直接调用时，我们尝试使用 no-cors 模式
-      // 但这种方式会返回一个不可操作的 opaque 响应，因此我们使用带有回退的方法
-      try {
-        const response = await fetch(
-          "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis",
-          {
-            method: "POST",
-            headers: {
-              "X-DashScope-Async": "enable",
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify(requestBody),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`请求失败: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log("API response:", JSON.stringify(data, null, 2));
-        
-        if (data.output?.task_id) {
-          return {
-            task_id: data.output.task_id,
-            task_status: data.output.task_status || "PENDING"
-          };
-        } else if (data.task_id) {
-          return {
-            task_id: data.task_id,
-            task_status: data.task_status || "PENDING"
-          };
-        } else {
-          throw new Error("API 响应中缺少任务 ID");
-        }
-      } catch (corsError) {
-        // 如果正常调用失败，尝试无操作响应模式
-        console.warn("常规API调用失败，正在尝试 no-cors 模式（将回退到开发模式数据）:", corsError);
-        
-        try {
-          // 使用 no-cors 发送请求，但我们不能读取响应
-          await fetch(
-            "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis",
-            {
-              method: "POST",
-              headers: {
-                "X-DashScope-Async": "enable",
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`,
-              },
-              mode: "no-cors", // 这会导致返回一个不可操作的 opaque 响应
-              body: JSON.stringify(requestBody),
-            }
-          );
-          
-          // 无法获取实际任务 ID，使用开发模式的假数据
-          console.log("使用 no-cors 发送了请求，但无法读取响应。使用模拟数据。");
-          toast.warning("由于CORS限制，无法直接访问API数据。正在使用模拟数据演示功能。");
-          
-          // 创建模拟任务 ID，类似于开发模式
-          const mockTaskId = `cors-fallback-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-          return {
-            task_id: mockTaskId,
-            task_status: "PENDING"
-          };
-        } catch (noCorsError) {
-          console.error("no-cors 模式也失败:", noCorsError);
-          throw new Error("无法连接到API服务器，请检查网络连接");
-        }
+      if (error) {
+        console.error("Edge Function error:", error);
+        throw new Error(`Edge Function error: ${error.message}`);
+      }
+      
+      if (!data) {
+        throw new Error("No data returned from Edge Function");
+      }
+      
+      // Extract task ID and status from the response
+      if (data.output?.task_id) {
+        return {
+          task_id: data.output.task_id,
+          task_status: data.output.task_status || "PENDING"
+        };
+      } else if (data.task_id) {
+        return {
+          task_id: data.task_id,
+          task_status: data.task_status || "PENDING"
+        };
+      } else {
+        throw new Error("API 响应中缺少任务 ID");
       }
     }
   } catch (error) {
@@ -180,7 +134,7 @@ export const createPosterTask = async (
   }
 };
 
-// Function to query the task result based on Alibaba Cloud API
+// Function to query the task result using our Supabase Edge Function
 export const getPosterTaskResult = async (
   taskId: string
 ): Promise<PosterTaskResult> => {
@@ -219,76 +173,35 @@ export const getPosterTaskResult = async (
         end_time: new Date().toISOString(),
       };
     } else {
-      // 真实的API调用 - 正常模式尝试
-      console.log("生产模式: 调用阿里云API检查任务状态");
+      // Call our Supabase Edge Function to get task result
+      console.log("Production mode: Calling Edge Function to get task result");
       
-      try {
-        const response = await fetch(
-          `https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`,
-          {
-            method: "GET",
-            headers: {
-              "Authorization": `Bearer ${apiKey}`,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`请求失败: ${response.status} ${response.statusText}`);
+      const { data, error } = await supabase.functions.invoke('poster-task-result', {
+        body: {
+          apiKey,
+          taskId
         }
-
-        const data = await response.json();
-        console.log("任务结果API响应:", JSON.stringify(data, null, 2));
-        
-        // 根据文档提取输出对象
-        if (data.output) {
-          return data.output;
-        } else if (data.task_status) {
-          // 替代响应格式 - 直接在响应根中
-          return data;
-        } else {
-          throw new Error("API 响应中缺少输出数据");
-        }
-      } catch (corsError) {
-        console.warn("常规任务结果获取失败，尝试 no-cors 模式（将回退到模拟数据）:", corsError);
-        
-        try {
-          // 尝试 no-cors 模式，但由于无法读取响应，我们将回退到模拟数据
-          await fetch(
-            `https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`,
-            {
-              method: "GET",
-              headers: {
-                "Authorization": `Bearer ${apiKey}`,
-              },
-              mode: "no-cors",
-            }
-          );
-          
-          console.log("已发送 no-cors 请求，但无法读取响应。使用模拟数据。");
-          
-          // 使用模拟数据
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          
-          // 使用可靠的本地图片
-          const mockImages = [
-            "/lovable-uploads/a2db5cbb-2a6a-4eba-90ca-520fec9edaac.png", 
-          ];
-          
-          return {
-            task_id: taskId,
-            task_status: "SUCCEEDED",
-            render_urls: mockImages,
-            auxiliary_parameters: ["cors-fallback-param"],
-            bg_urls: mockImages,
-            submit_time: new Date().toISOString(),
-            scheduled_time: new Date().toISOString(),
-            end_time: new Date().toISOString(),
-          };
-        } catch (noCorsError) {
-          console.error("no-cors 模式也失败:", noCorsError);
-          throw new Error("无法连接到API服务器，请检查网络连接");
-        }
+      });
+      
+      console.log("Edge Function response:", data);
+      
+      if (error) {
+        console.error("Edge Function error:", error);
+        throw new Error(`Edge Function error: ${error.message}`);
+      }
+      
+      if (!data) {
+        throw new Error("No data returned from Edge Function");
+      }
+      
+      // Process the response data
+      if (data.output) {
+        return data.output;
+      } else if (data.task_status) {
+        // Alternative response format - directly in response root
+        return data;
+      } else {
+        throw new Error("API 响应中缺少输出数据");
       }
     }
   } catch (error) {

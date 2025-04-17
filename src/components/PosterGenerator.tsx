@@ -12,7 +12,7 @@ import {
 } from "@/services/posterService";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Info } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 const PosterGenerator = () => {
   const [isApiKeySet, setIsApiKeySet] = useState(false);
@@ -21,7 +21,6 @@ const PosterGenerator = () => {
   const [isFirstGeneration, setIsFirstGeneration] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectivityError, setConnectivityError] = useState<string | null>(null);
-  const [corsWarning, setCorsWarning] = useState<string | null>(null);
   const [pollingId, setPollingId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -33,9 +32,6 @@ const PosterGenerator = () => {
 
     // Check connectivity to Alipay CDN
     checkConnectivity();
-    
-    // Check for CORS issues with DashScope API
-    checkCorsStatus();
     
     // Cleanup polling on component unmount
     return () => {
@@ -56,38 +52,6 @@ const PosterGenerator = () => {
     } catch (err) {
       console.error("Connectivity test failed:", err);
       setConnectivityError("检测到外部资源加载问题，可能影响海报展示。请确保您的网络可以访问阿里云资源。");
-    }
-  };
-
-  // Function to check CORS status with DashScope API
-  const checkCorsStatus = async () => {
-    try {
-      // 检查是否在本地开发环境
-      if (window.location.hostname === "localhost" || 
-          window.location.hostname === "127.0.0.1") {
-        // 本地环境可能没有CORS问题
-        return;
-      }
-      
-      // 尝试通过 OPTIONS 请求检查 CORS 配置
-      const testResponse = await fetch(
-        "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis", 
-        { 
-          method: 'OPTIONS',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-        });
-        
-      // 如果收到有效响应，可能不存在CORS问题
-      if (testResponse.ok) {
-        setCorsWarning(null);
-      }
-    } catch (err) {
-      console.warn("CORS preflight check failed:", err);
-      // 设置CORS警告
-      setCorsWarning("检测到跨域请求问题 (CORS)，API可能无法直接在浏览器中调用。应用将使用模拟数据进行演示。");
     }
   };
 
@@ -197,13 +161,6 @@ const PosterGenerator = () => {
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{connectivityError}</AlertDescription>
-          </Alert>
-        )}
-        
-        {corsWarning && (
-          <Alert className="mb-4 border-amber-500 bg-amber-50">
-            <Info className="h-4 w-4 text-amber-600" />
-            <AlertDescription className="text-amber-800">{corsWarning}</AlertDescription>
           </Alert>
         )}
         

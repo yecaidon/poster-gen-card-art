@@ -1,1 +1,8 @@
+
 project_id = "adpxtjnsdpxamceaqqvt"
+
+[functions.poster-generation]
+verify_jwt = false
+
+[functions.poster-task-result]
+verify_jwt = false
