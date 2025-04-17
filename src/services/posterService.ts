@@ -82,6 +82,7 @@ export const createPosterTask = async (
     if (isDevelopment) {
       // Create a mock task ID for development
       const task_id = `mock-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      console.log("Development mode: Created mock task ID:", task_id);
       
       // Return a mock response
       return {
@@ -91,6 +92,16 @@ export const createPosterTask = async (
     } else {
       // Real API call to Alibaba Cloud for production
       // This follows the example curl request format exactly
+      console.log("Production mode: Calling Alibaba Cloud API");
+      
+      const requestBody = {
+        model: "wanx-poster-generation-v1",
+        input: params,
+        parameters: {}
+      };
+      
+      console.log("API Request body:", JSON.stringify(requestBody, null, 2));
+      
       const response = await fetch(
         "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis",
         {
@@ -100,28 +111,36 @@ export const createPosterTask = async (
             "Content-Type": "application/json",
             "Authorization": `Bearer ${apiKey}`,
           },
-          body: JSON.stringify({
-            model: "wanx-poster-generation-v1",
-            input: params,
-            parameters: {},
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { message: errorText };
+        }
         console.error("API error response:", errorData);
         throw new Error(errorData.message || `请求失败: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      // The Alibaba Cloud API returns a response with an output field containing the task info
-      console.log("API response:", data);
+      // Log the complete API response for debugging
+      console.log("API response:", JSON.stringify(data, null, 2));
       
       if (data.output?.task_id) {
         return {
           task_id: data.output.task_id,
           task_status: data.output.task_status || "PENDING"
+        };
+      } else if (data.task_id) {
+        // Alternative response format
+        return {
+          task_id: data.task_id,
+          task_status: data.task_status || "PENDING"
         };
       } else {
         throw new Error("API 响应中缺少任务 ID");
@@ -153,26 +172,25 @@ export const getPosterTaskResult = async (
       // Use reliable local images that won't fail to load
       const mockImages = [
         "/lovable-uploads/a2db5cbb-2a6a-4eba-90ca-520fec9edaac.png", 
-        "/placeholder.svg", 
-        "/favicon.ico" 
       ];
       
-      // Number of images to return based on generate_num
-      const numImages = Math.min(3, Math.max(1, Math.floor(Math.random() * 3) + 1));
+      console.log("Development mode: Returning mock poster results");
       
       // Return mock results
       return {
         task_id: taskId,
         task_status: "SUCCEEDED",
-        render_urls: mockImages.slice(0, numImages),
-        auxiliary_parameters: Array(numImages).fill("mock-aux-param"),
-        bg_urls: mockImages.slice(0, numImages),
+        render_urls: mockImages,
+        auxiliary_parameters: ["mock-aux-param"],
+        bg_urls: mockImages,
         submit_time: new Date().toISOString(),
         scheduled_time: new Date().toISOString(),
         end_time: new Date().toISOString(),
       };
     } else {
       // Real API call for production - exactly following the example
+      console.log("Production mode: Calling Alibaba Cloud API to check task status");
+      
       const response = await fetch(
         `https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`,
         {
@@ -184,17 +202,26 @@ export const getPosterTaskResult = async (
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { message: errorText };
+        }
         console.error("API error response:", errorData);
         throw new Error(errorData.message || `请求失败: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log("Task result API response:", data);
+      console.log("Task result API response:", JSON.stringify(data, null, 2));
       
-      // The Alibaba Cloud API returns a response with an output field containing the result
+      // Extract the output object according to the API documentation
       if (data.output) {
         return data.output;
+      } else if (data.task_status) {
+        // Alternative response format - direct in response root
+        return data;
       } else {
         throw new Error("API 响应中缺少输出数据");
       }

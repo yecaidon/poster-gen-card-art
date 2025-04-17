@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,7 +58,17 @@ const PosterForm = ({ onSubmit, isSubmitting, isFirstGeneration }: PosterFormPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formState);
+    
+    // Create a clean copy of the form state
+    const finalParams = {...formState};
+    
+    // If lora_name is "none", set it to undefined to exclude it from the API call
+    if (finalParams.lora_name === "none") {
+      finalParams.lora_name = undefined;
+    }
+    
+    // Send the cleaned up parameters to the parent component
+    onSubmit(finalParams);
   };
 
   const isFormValid = !!formState.title;

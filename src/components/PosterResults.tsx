@@ -29,6 +29,9 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
         initialLoadingState[url] = true;
       });
       setLoadingImages(initialLoadingState);
+      
+      // Log the image URLs for debugging
+      console.log("Received image URLs:", taskResult.render_urls);
     }
   }, [taskResult]);
 
@@ -74,14 +77,15 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
 
   // Function to handle image load completion
   const handleImageLoaded = (imageUrl: string) => {
+    console.log("Image loaded successfully:", imageUrl);
     setLoadingImages(prev => ({ ...prev, [imageUrl]: false }));
   };
 
   // Function to handle image errors
   const handleImageError = (imageUrl: string) => {
+    console.error(`图片加载失败: ${imageUrl}`);
     setImageErrors(prev => ({ ...prev, [imageUrl]: true }));
     setLoadingImages(prev => ({ ...prev, [imageUrl]: false }));
-    console.error(`图片加载失败: ${imageUrl}`);
   };
 
   // Function to retry loading an image
@@ -93,6 +97,8 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
     const timestampedUrl = imageUrl.includes('?') 
       ? `${imageUrl}&t=${Date.now()}` 
       : `${imageUrl}?t=${Date.now()}`;
+    
+    console.log("Retrying image load with timestamped URL:", timestampedUrl);
     
     const img = new Image();
     img.onload = () => handleImageLoaded(imageUrl);
@@ -148,7 +154,7 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {taskResult.render_urls.map((imageUrl, index) => (
           <div 
-            key={index} 
+            key={`${imageUrl}-${index}`}
             className={`relative rounded-lg overflow-hidden border-2 transition-all duration-200 cursor-pointer
               ${selectedImages.includes(imageUrl) 
                 ? 'border-theme-blue shadow-lg shadow-theme-blue/20' 

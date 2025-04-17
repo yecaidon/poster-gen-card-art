@@ -64,10 +64,13 @@ const PosterGenerator = () => {
     setError(null);
     
     try {
+      console.log("Submitting poster generation with params:", params);
+      
       // Create a task using the API
       const taskResponse = await createPosterTask(params);
       
       if (taskResponse.task_id) {
+        console.log("Task created successfully with ID:", taskResponse.task_id);
         // Start polling for the task result
         pollTaskResult(taskResponse.task_id);
       } else {
@@ -95,8 +98,12 @@ const PosterGenerator = () => {
       }
       
       try {
+        console.log(`Polling task result (attempt ${retryCount + 1}/${maxRetries})`);
+        
         // Get the task result from the API
         const result = await getPosterTaskResult(taskId);
+        
+        console.log("Task result:", result);
         
         if (result.task_status === "SUCCEEDED") {
           if (result.render_urls && result.render_urls.length > 0) {
@@ -113,6 +120,7 @@ const PosterGenerator = () => {
           setError(result.message || "任务执行失败");
         } else if (["PENDING", "RUNNING", "SUSPENDED"].includes(result.task_status)) {
           // Task is still running, poll again after a delay
+          console.log(`Task is still ${result.task_status}, polling again in ${pollInterval}ms`);
           retryCount++;
           const timeoutId = setTimeout(poll, pollInterval);
           setPollingId(Number(timeoutId));
