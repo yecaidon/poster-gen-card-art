@@ -107,6 +107,7 @@ const PosterGenerator = () => {
         
         if (result.task_status === "SUCCEEDED") {
           if (result.render_urls && result.render_urls.length > 0) {
+            // Set the new task result without clearing previous results
             setTaskResult(result);
             setIsSubmitting(false);
             setIsFirstGeneration(false);

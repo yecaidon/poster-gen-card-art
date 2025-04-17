@@ -218,6 +218,8 @@ export const downloadImage = async (imageUrl: string, fileName: string) => {
     
     // Special handling for local development resources
     if (imageUrl.startsWith('/')) {
+      console.log("Local resource detected, downloading from relative path");
+      
       const response = await fetch(imageUrl);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -225,35 +227,82 @@ export const downloadImage = async (imageUrl: string, fileName: string) => {
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
+      
+      // Create a download link and trigger download
       const link = document.createElement("a");
       link.href = url;
       link.download = fileName;
-      document.body.appendChild(link); // This is important for Firefox
+      link.style.display = "none";
+      document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link); // Clean up
-      window.URL.revokeObjectURL(url);
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+      
       return;
     }
     
-    // Regular image download procedure for remote URLs
-    const response = await fetch(imageUrl, { 
-      mode: 'cors',
-      cache: 'no-cache',
-    });
+    // Add a timestamp to URL to avoid caching issues
+    const timestampedUrl = imageUrl.includes('?') 
+      ? `${imageUrl}&t=${Date.now()}` 
+      : `${imageUrl}?t=${Date.now()}`;
+      
+    console.log("Attempting to download with timestamped URL:", timestampedUrl);
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    try {
+      // Try direct download first (may fail due to CORS)
+      const response = await fetch(timestampedUrl, { 
+        mode: 'cors',
+        cache: 'no-cache',
+        headers: {
+          'Accept': 'image/jpeg, image/png, image/webp, image/*'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create and trigger download
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+      
+    } catch (error) {
+      console.error("Direct download failed, using proxy approach:", error);
+      
+      // As a fallback, try to open in a new tab
+      // This works around CORS issues but requires user action
+      const link = document.createElement("a");
+      link.href = timestampedUrl;
+      link.target = "_blank";
+      link.download = fileName; // Still set download attribute
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link);
+      }, 100);
+      
+      throw new Error("直接下载失败，已在新标签打开图片。请在图片上右键选择'另存为'来下载。");
     }
-    
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link); // This is important for Firefox
-    link.click();
-    document.body.removeChild(link); // Clean up
-    window.URL.revokeObjectURL(url);
     
     toast.success(`图片 ${fileName} 下载成功`);
   } catch (error) {

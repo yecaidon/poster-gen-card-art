@@ -15,23 +15,27 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
+  const [allImages, setAllImages] = useState<string[]>([]);
 
   useEffect(() => {
-    // Reset selected images when task result changes
-    setSelectedImages([]);
-    setImageErrors({});
-    setLoadingImages({});
-    
-    // Set initial loading state for all images
+    // When new task result comes in, add its images to the collection
     if (taskResult?.render_urls) {
+      // Set initial loading state for new images
       const initialLoadingState: Record<string, boolean> = {};
       taskResult.render_urls.forEach(url => {
         initialLoadingState[url] = true;
       });
-      setLoadingImages(initialLoadingState);
+      setLoadingImages(prev => ({ ...prev, ...initialLoadingState }));
+      
+      // Add new images to the collection without replacing old ones
+      setAllImages(prev => {
+        // Filter out duplicates
+        const newImages = taskResult.render_urls.filter(url => !prev.includes(url));
+        return [...prev, ...newImages];
+      });
       
       // Log the image URLs for debugging
-      console.log("Received image URLs:", taskResult.render_urls);
+      console.log("Received new image URLs:", taskResult.render_urls);
     }
   }, [taskResult]);
 
@@ -55,10 +59,9 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
     let successCount = 0;
     let errorCount = 0;
     
-    for (let i = 0; i < selectedImages.length; i++) {
+    for (const imageUrl of selectedImages) {
       try {
-        const imageUrl = selectedImages[i];
-        const fileName = `poster-${i + 1}-${new Date().getTime()}.jpg`;
+        const fileName = `poster-${Date.now()}-${successCount + errorCount + 1}.jpg`;
         await downloadImage(imageUrl, fileName);
         successCount++;
       } catch (err) {
@@ -106,9 +109,6 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
     img.src = timestampedUrl;
   };
 
-  // Local fallback image that's guaranteed to exist
-  const fallbackImage = "/lovable-uploads/a2db5cbb-2a6a-4eba-90ca-520fec9edaac.png";
-
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
@@ -118,7 +118,7 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
     );
   }
 
-  if (error) {
+  if (error && allImages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
         <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
@@ -128,7 +128,7 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
     );
   }
 
-  if (!taskResult?.render_urls || taskResult.render_urls.length === 0) {
+  if (allImages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
         <p className="text-bright-4 mb-2">尚未生成海报</p>
@@ -151,8 +151,19 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
         </Button>
       </div>
       
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+          <div className="flex">
+            <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+            <p className="text-sm text-red-700">
+              最新生成遇到错误: {error}
+            </p>
+          </div>
+        </div>
+      )}
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {taskResult.render_urls.map((imageUrl, index) => (
+        {allImages.map((imageUrl, index) => (
           <div 
             key={`${imageUrl}-${index}`}
             className={`relative rounded-lg overflow-hidden border-2 transition-all duration-200 cursor-pointer
