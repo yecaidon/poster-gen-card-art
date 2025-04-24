@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.poster-task-result]
 verify_jwt = false
+
+[functions.poster-image-proxy]
+verify_jwt = false
