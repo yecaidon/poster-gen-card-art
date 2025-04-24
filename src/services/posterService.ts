@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -228,140 +227,51 @@ export const downloadImage = async (imageUrl: string, fileName: string) => {
     
     // Special handling for local development resources
     if (imageUrl.startsWith('/')) {
-      console.log("Local resource detected, downloading from relative path");
-      
+      console.log("Local resource detected");
       const response = await fetch(imageUrl);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      
-      // Create a download link and trigger download
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      link.style.display = "none";
-      document.body.appendChild(link);
-      link.click();
-      
-      // Cleanup
-      setTimeout(() => {
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      }, 100);
-      
+      triggerDownload(blob, fileName);
       return;
     }
     
     // For non-local images, use our proxy edge function
-    try {
-      console.log("Using proxy to download image:", imageUrl);
-      
-      // Use the proper approach to call the edge function
-      const { data, error } = await supabase.functions.invoke('poster-image-proxy', {
-        body: { imageUrl }
-      });
-      
-      if (error) {
-        console.error("Edge function error:", error);
-        throw new Error(`代理服务器错误: ${error.message}`);
-      }
-      
-      // Handle the response from the edge function
-      if (data) {
-        console.log("Edge function response received:", typeof data);
-        
-        // Extract binary data if it's in the response
-        let binaryData: ArrayBuffer | Blob;
-        let blobType = 'image/jpeg';
-        
-        if (data instanceof ArrayBuffer || data instanceof Blob) {
-          binaryData = data;
-        } else if (data.base64) {
-          // Handle base64 encoded data if that's how it's returned
-          const binary = atob(data.base64);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) {
-            bytes[i] = binary.charCodeAt(i);
-          }
-          binaryData = bytes.buffer;
-          if (data.contentType) blobType = data.contentType;
-        } else {
-          // Fallback to direct fetch if edge function doesn't return binary data
-          throw new Error("代理未返回二进制数据，尝试直接下载");
-        }
-        
-        // Create blob and download
-        const blob = binaryData instanceof Blob ? binaryData : new Blob([binaryData], { type: blobType });
-        const url = window.URL.createObjectURL(blob);
-        
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        link.style.display = "none";
-        document.body.appendChild(link);
-        link.click();
-        
-        setTimeout(() => {
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        }, 100);
-        
-        toast.success(`图片 ${fileName} 下载成功`);
-        return;
-      } else {
-        throw new Error("代理未返回有效数据");
-      }
-    } catch (proxyError) {
-      console.error("Proxy download failed:", proxyError);
-      
-      // Try direct download as last resort
-      console.log("Attempting direct download as last resort");
-      
-      // Replace HTTP with HTTPS if needed
-      const secureUrl = imageUrl.replace(/^http:\/\//i, 'https://');
-      
-      try {
-        // Create a simple proxy using fetch with the 'blob' response type
-        // This may work in some cases where the server allows CORS
-        const response = await fetch(secureUrl);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        link.style.display = "none";
-        document.body.appendChild(link);
-        link.click();
-        
-        setTimeout(() => {
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        }, 100);
-        
-        toast.success(`图片 ${fileName} 下载成功`);
-        return;
-      } catch (directError) {
-        console.error("All download methods failed:", directError);
-        
-        // Final fallback: try to open the image in a new tab
-        toast.error("下载失败，正在尝试在新标签页中打开图片...");
-        window.open(secureUrl, '_blank');
-        
-        throw new Error("无法下载图片，已尝试在新标签页中打开");
-      }
+    console.log("Using proxy to download image");
+    
+    const { data, error } = await supabase.functions.invoke('poster-image-proxy', {
+      body: { imageUrl }
+    });
+    
+    if (error) {
+      console.error("Edge function error:", error);
+      throw new Error(`代理服务器错误: ${error.message}`);
     }
+
+    // Convert response to Blob
+    const blob = new Blob([data], { type: 'image/png' });
+    if (blob.size === 0) {
+      throw new Error("Downloaded image is empty");
+    }
+
+    // Trigger the download
+    triggerDownload(blob, fileName);
+    toast.success(`图片 ${fileName} 下载成功`);
+
   } catch (error) {
     console.error("Error downloading image:", error);
     toast.error(`下载图片失败: ${error instanceof Error ? error.message : "未知错误"}`);
     throw error;
   }
+};
+
+// Helper function to trigger the download
+const triggerDownload = (blob: Blob, fileName: string) => {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
 };

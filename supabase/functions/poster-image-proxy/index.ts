@@ -44,21 +44,22 @@ serve(async (req) => {
       throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
     }
 
-    // Get the image data and content type
+    // Get the image data
     const imageData = await imageResponse.arrayBuffer();
-    const contentType = imageResponse.headers.get('Content-Type') || 'image/jpeg';
+    const contentType = imageResponse.headers.get('Content-Type') || 'application/octet-stream';
     
     console.log(`Successfully fetched image, size: ${imageData.byteLength} bytes, type: ${contentType}`);
     
-    // Return the image with proper headers
-    return new Response(imageData, { 
-      headers: { 
+    // Return the binary data directly with proper headers
+    return new Response(imageData, {
+      headers: {
         ...corsHeaders,
         'Content-Type': contentType,
         'Content-Length': imageData.byteLength.toString(),
         'Cache-Control': 'public, max-age=86400',
       }
     });
+
   } catch (error) {
     console.error("Error proxying image:", error);
     
