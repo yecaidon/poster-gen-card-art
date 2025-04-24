@@ -1,9 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { PosterTaskResult, downloadImage } from "@/services/posterService";
 import { Button } from "@/components/ui/button";
-import { Download, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { Download, CheckCircle, AlertCircle, RefreshCw, X, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
 
 interface PosterResultsProps {
   taskResult: PosterTaskResult | null;
@@ -16,25 +16,21 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
   const [allImages, setAllImages] = useState<string[]>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
-    // When new task result comes in, add its images to the collection
     if (taskResult?.render_urls) {
-      // Set initial loading state for new images
       const initialLoadingState: Record<string, boolean> = {};
       taskResult.render_urls.forEach(url => {
         initialLoadingState[url] = true;
       });
       setLoadingImages(prev => ({ ...prev, ...initialLoadingState }));
       
-      // Add new images to the collection without replacing old ones
       setAllImages(prev => {
-        // Filter out duplicates
         const newImages = taskResult.render_urls.filter(url => !prev.includes(url));
         return [...prev, ...newImages];
       });
       
-      // Log the image URLs for debugging
       console.log("Received new image URLs:", taskResult.render_urls);
     }
   }, [taskResult]);
@@ -55,7 +51,6 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
       return;
     }
 
-    // Download all selected images
     let successCount = 0;
     let errorCount = 0;
     
@@ -67,7 +62,6 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
       } catch (err) {
         console.error("Download error:", err);
         errorCount++;
-        // Continue with other downloads even if one fails
       }
     }
 
@@ -78,25 +72,21 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
     }
   };
 
-  // Function to handle image load completion
   const handleImageLoaded = (imageUrl: string) => {
     console.log("Image loaded successfully:", imageUrl);
     setLoadingImages(prev => ({ ...prev, [imageUrl]: false }));
   };
 
-  // Function to handle image errors
   const handleImageError = (imageUrl: string) => {
     console.error(`图片加载失败: ${imageUrl}`);
     setImageErrors(prev => ({ ...prev, [imageUrl]: true }));
     setLoadingImages(prev => ({ ...prev, [imageUrl]: false }));
   };
 
-  // Function to retry loading an image
   const retryImageLoad = (imageUrl: string) => {
     setImageErrors(prev => ({ ...prev, [imageUrl]: false }));
     setLoadingImages(prev => ({ ...prev, [imageUrl]: true }));
     
-    // Force browser to reload the image by appending a timestamp
     const timestampedUrl = imageUrl.includes('?') 
       ? `${imageUrl}&t=${Date.now()}` 
       : `${imageUrl}?t=${Date.now()}`;
@@ -107,6 +97,17 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
     img.onload = () => handleImageLoaded(imageUrl);
     img.onerror = () => handleImageError(imageUrl);
     img.src = timestampedUrl;
+  };
+
+  const handleImagePreview = (imageUrl: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!imageErrors[imageUrl]) {
+      setPreviewImage(imageUrl);
+    }
+  };
+
+  const handleClosePreview = () => {
+    setPreviewImage(null);
   };
 
   if (isLoading) {
@@ -171,8 +172,8 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
                 ? 'border-theme-blue shadow-lg shadow-theme-blue/20' 
                 : 'border-dark-3 hover:border-dark-1'}`}
             onClick={() => !imageErrors[imageUrl] && toggleImageSelection(imageUrl)}
+            onDoubleClick={(e) => handleImagePreview(imageUrl, e)}
           >
-            {/* Use a more reliable image display approach with error handling */}
             {imageErrors[imageUrl] ? (
               <div className="w-full aspect-[3/4] bg-gray-200 flex flex-col items-center justify-center p-4 text-center">
                 <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
@@ -208,20 +209,27 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
                     transition: 'opacity 0.3s ease'
                   }}
                 />
+                <div className="absolute top-3 right-3 bg-dark-7/70 rounded-full p-1" 
+                  onClick={(e) => {
+                    e.stopPropagation(); 
+                    handleImagePreview(imageUrl, e);
+                  }}
+                >
+                  <ZoomIn className="w-5 h-5 text-bright-2" />
+                </div>
               </div>
             )}
             
             {selectedImages.includes(imageUrl) && !imageErrors[imageUrl] && (
-              <div className="absolute top-3 right-3">
+              <div className="absolute top-3 left-3">
                 <CheckCircle className="w-6 h-6 text-theme-blue" fill="rgba(29, 58, 255, 0.2)" />
               </div>
             )}
             
             <div className="absolute bottom-0 left-0 right-0 bg-dark-7/80 py-2 px-3 flex justify-between items-center">
               <p className="text-sm text-bright-3">
-                {imageErrors[imageUrl] ? '图片加载失败' : '点击选择'}
+                {imageErrors[imageUrl] ? '图片加载失败' : '点击选择，双击预览'}
               </p>
-              {/* Show selection status */}
               {!imageErrors[imageUrl] && (
                 <p className="text-xs text-bright-5">
                   {selectedImages.includes(imageUrl) ? '已选择' : '未选择'}
@@ -231,6 +239,40 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
           </div>
         ))}
       </div>
+
+      <Dialog open={previewImage !== null} onOpenChange={handleClosePreview}>
+        <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-dark-8 border-dark-4">
+          <DialogClose className="absolute right-3 top-3 z-10 rounded-full bg-dark-7/80 p-1.5 text-bright-5 hover:text-bright-3 focus:outline-none">
+            <X className="h-5 w-5" />
+            <span className="sr-only">关闭</span>
+          </DialogClose>
+          
+          {previewImage && (
+            <div className="relative w-full max-h-[80vh] overflow-hidden flex items-center justify-center">
+              <img 
+                src={previewImage} 
+                alt="海报预览"
+                className="max-w-full max-h-[80vh] object-contain" 
+              />
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
+                <Button 
+                  onClick={() => {
+                    if (previewImage) {
+                      const fileName = `poster-preview-${Date.now()}.jpg`;
+                      downloadImage(previewImage, fileName);
+                    }
+                    handleClosePreview();
+                  }}
+                  className="poster-button poster-button-primary"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  下载此图片
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
