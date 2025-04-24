@@ -34,7 +34,8 @@ serve(async (req) => {
     // Fetch the image from the remote server
     const imageResponse = await fetch(secureUrl, {
       headers: {
-        'Accept': 'image/jpeg, image/png, image/webp, image/*'
+        'Accept': 'image/jpeg, image/png, image/webp, image/*',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       },
     });
 
@@ -47,13 +48,15 @@ serve(async (req) => {
     const imageData = await imageResponse.arrayBuffer();
     const contentType = imageResponse.headers.get('Content-Type') || 'image/jpeg';
     
+    console.log(`Successfully fetched image, size: ${imageData.byteLength} bytes, type: ${contentType}`);
+    
     // Return the image with proper headers
     return new Response(imageData, { 
       headers: { 
         ...corsHeaders,
         'Content-Type': contentType,
-        'Content-Disposition': 'attachment',
-        'Cache-Control': 'no-cache'
+        'Content-Length': imageData.byteLength.toString(),
+        'Cache-Control': 'public, max-age=86400',
       }
     });
   } catch (error) {

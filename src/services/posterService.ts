@@ -259,22 +259,43 @@ export const downloadImage = async (imageUrl: string, fileName: string) => {
     try {
       console.log("Using proxy to download image:", imageUrl);
       
+      // Use the proper approach to call the edge function
       const { data, error } = await supabase.functions.invoke('poster-image-proxy', {
         body: { imageUrl }
       });
       
       if (error) {
-        console.error("Proxy error:", error);
+        console.error("Edge function error:", error);
         throw new Error(`代理服务器错误: ${error.message}`);
       }
       
-      if (!data) {
-        throw new Error("代理未返回有效数据");
-      }
-      
-      // If the response is binary data (blob)
-      if (data instanceof Blob) {
-        const url = window.URL.createObjectURL(data);
+      // Handle the response from the edge function
+      if (data) {
+        console.log("Edge function response received:", typeof data);
+        
+        // Extract binary data if it's in the response
+        let binaryData: ArrayBuffer | Blob;
+        let blobType = 'image/jpeg';
+        
+        if (data instanceof ArrayBuffer || data instanceof Blob) {
+          binaryData = data;
+        } else if (data.base64) {
+          // Handle base64 encoded data if that's how it's returned
+          const binary = atob(data.base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          binaryData = bytes.buffer;
+          if (data.contentType) blobType = data.contentType;
+        } else {
+          // Fallback to direct fetch if edge function doesn't return binary data
+          throw new Error("代理未返回二进制数据，尝试直接下载");
+        }
+        
+        // Create blob and download
+        const blob = binaryData instanceof Blob ? binaryData : new Blob([binaryData], { type: blobType });
+        const url = window.URL.createObjectURL(blob);
         
         const link = document.createElement("a");
         link.href = url;
@@ -290,11 +311,23 @@ export const downloadImage = async (imageUrl: string, fileName: string) => {
         
         toast.success(`图片 ${fileName} 下载成功`);
         return;
+      } else {
+        throw new Error("代理未返回有效数据");
       }
+    } catch (proxyError) {
+      console.error("Proxy download failed:", proxyError);
       
-      // If we received a URL or other data instead of binary
-      if (data.url) {
-        const response = await fetch(data.url);
+      // Try direct download as last resort
+      console.log("Attempting direct download as last resort");
+      
+      // Replace HTTP with HTTPS if needed
+      const secureUrl = imageUrl.replace(/^http:\/\//i, 'https://');
+      
+      try {
+        // Create a simple proxy using fetch with the 'blob' response type
+        // This may work in some cases where the server allows CORS
+        const response = await fetch(secureUrl);
+        
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -316,47 +349,14 @@ export const downloadImage = async (imageUrl: string, fileName: string) => {
         
         toast.success(`图片 ${fileName} 下载成功`);
         return;
-      }
-      
-      // If we got here, something went wrong with the response format
-      throw new Error("代理返回了无效的数据格式");
-      
-    } catch (proxyError) {
-      console.error("Proxy download failed:", proxyError);
-      
-      // 我们不再使用打开新标签页的方法，而是使用更可靠的fetch API二进制下载
-      console.log("Attempting binary download directly with fetch API");
-      
-      // Replace HTTP with HTTPS as a last resort
-      const secureUrl = imageUrl.replace(/^http:\/\//i, 'https://');
-      
-      try {
-        const response = await fetch(secureUrl, {
-          mode: 'no-cors', // 尝试绕过CORS
-          cache: 'no-cache',
-        });
+      } catch (directError) {
+        console.error("All download methods failed:", directError);
         
-        // 此时response对象可能不包含有效数据，但我们可以尝试
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
+        // Final fallback: try to open the image in a new tab
+        toast.error("下载失败，正在尝试在新标签页中打开图片...");
+        window.open(secureUrl, '_blank');
         
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        link.style.display = "none";
-        document.body.appendChild(link);
-        link.click();
-        
-        setTimeout(() => {
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        }, 100);
-        
-        toast.success(`图片 ${fileName} 下载成功`);
-        return;
-      } catch (fetchError) {
-        console.error("All download attempts failed:", fetchError);
-        throw new Error("无法下载图片，请稍后重试或联系管理员");
+        throw new Error("无法下载图片，已尝试在新标签页中打开");
       }
     }
   } catch (error) {
