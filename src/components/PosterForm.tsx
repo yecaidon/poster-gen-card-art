@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,7 +42,7 @@ const PosterForm = ({ onSubmit, isSubmitting, isFirstGeneration }: PosterFormPro
     sub_title: "家庭团聚，共享天伦之乐",
     body_text: "春节是中国最重要的传统节日之一，它象征着新的开始和希望",
     prompt_text_zh: "灯笼，小猫，梅花",
-    wh_ratios: "竖版",
+    wh_ratios: "9:16",
     lora_name: "童话油画",
     lora_weight: 0.8,
     ctrl_ratio: 0.7,
@@ -59,15 +58,12 @@ const PosterForm = ({ onSubmit, isSubmitting, isFirstGeneration }: PosterFormPro
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Create a clean copy of the form state
     const finalParams = {...formState};
     
-    // If lora_name is "none", set it to undefined to exclude it from the API call
     if (finalParams.lora_name === "none") {
       finalParams.lora_name = undefined;
     }
     
-    // Send the cleaned up parameters to the parent component
     onSubmit(finalParams);
   };
 
@@ -151,8 +147,8 @@ const PosterForm = ({ onSubmit, isSubmitting, isFirstGeneration }: PosterFormPro
             <SelectValue placeholder="选择海报版式" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="横版">横版</SelectItem>
-            <SelectItem value="竖版">竖版</SelectItem>
+            <SelectItem value="16:9">横版 (16:9)</SelectItem>
+            <SelectItem value="9:16">竖版 (9:16)</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -175,7 +175,7 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
             onDoubleClick={(e) => handleImagePreview(imageUrl, e)}
           >
             {imageErrors[imageUrl] ? (
-              <div className="w-full aspect-[3/4] bg-gray-200 flex flex-col items-center justify-center p-4 text-center">
+              <div className={`w-full ${taskResult?.wh_ratios === "16:9" ? "aspect-video" : "aspect-[9/16]"} bg-gray-200 flex flex-col items-center justify-center p-4 text-center`}>
                 <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
                 <p className="text-sm text-gray-600">图片加载失败</p>
                 <Button 
@@ -192,7 +192,7 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
                 </Button>
               </div>
             ) : (
-              <div className="relative w-full aspect-[3/4]">
+              <div className={`relative w-full ${taskResult?.wh_ratios === "16:9" ? "aspect-video" : "aspect-[9/16]"}`}>
                 {loadingImages[imageUrl] && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
                     <div className="loading-spinner"></div>
@@ -201,7 +201,7 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
                 <img 
                   src={imageUrl} 
                   alt={`海报 ${index + 1}`} 
-                  className="w-full h-full object-cover" 
+                  className="w-full h-full object-contain" 
                   onLoad={() => handleImageLoaded(imageUrl)}
                   onError={() => handleImageError(imageUrl)}
                   style={{
@@ -248,11 +248,11 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
           </DialogClose>
           
           {previewImage && (
-            <div className="relative w-full max-h-[80vh] overflow-hidden flex items-center justify-center">
+            <div className={`relative w-full ${taskResult?.wh_ratios === "16:9" ? "max-h-[60vh]" : "max-h-[80vh]"} overflow-hidden flex items-center justify-center`}>
               <img 
                 src={previewImage} 
                 alt="海报预览"
-                className="max-w-full max-h-[80vh] object-contain" 
+                className="max-w-full h-full object-contain" 
               />
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
                 <Button 
