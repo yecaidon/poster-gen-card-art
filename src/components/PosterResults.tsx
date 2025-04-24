@@ -141,8 +141,8 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-2">
         <h2 className="text-xl font-semibold">生成结果</h2>
         <Button 
           onClick={handleDownload}
@@ -165,7 +165,7 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
         </div>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-4">
         {allImages.map((imageUrl, index) => (
           <div 
             key={`${imageUrl}-${index}`}
@@ -177,7 +177,7 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
             onDoubleClick={(e) => handleImagePreview(imageUrl, e)}
           >
             {imageErrors[imageUrl] ? (
-              <div className={`w-full ${isLandscape(taskResult?.wh_ratios) ? "aspect-video" : "aspect-[9/16]"} bg-gray-200 flex flex-col items-center justify-center p-4 text-center`}>
+              <div className={`w-full ${isLandscape(taskResult?.wh_ratios) ? "aspect-video h-[220px]" : "aspect-[9/16] h-[300px]"} bg-gray-200 flex flex-col items-center justify-center p-4 text-center`}>
                 <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
                 <p className="text-sm text-gray-600">图片加载失败</p>
                 <Button 
@@ -194,7 +194,7 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
                 </Button>
               </div>
             ) : (
-              <div className={`relative w-full ${isLandscape(taskResult?.wh_ratios) ? "aspect-video" : "aspect-[9/16]"}`}>
+              <div className={`relative w-full ${isLandscape(taskResult?.wh_ratios) ? "aspect-video h-[220px]" : "aspect-[9/16] h-[300px]"}`}>
                 {loadingImages[imageUrl] && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
                     <div className="loading-spinner"></div>
