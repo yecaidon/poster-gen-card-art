@@ -72,7 +72,7 @@ const PosterGenerator = () => {
       if (taskResponse.task_id) {
         console.log("Task created successfully with ID:", taskResponse.task_id);
         // Start polling for the task result
-        pollTaskResult(taskResponse.task_id);
+        pollTaskResult(taskResponse.task_id, params.wh_ratios);
       } else {
         throw new Error("未获取到任务ID");
       }
@@ -84,7 +84,7 @@ const PosterGenerator = () => {
     }
   };
 
-  const pollTaskResult = async (taskId: string) => {
+  const pollTaskResult = async (taskId: string, whRatios: "16:9" | "9:16") => {
     let retryCount = 0;
     const maxRetries = 30; // Increased for longer running tasks
     const pollInterval = 3000; // 3 seconds
@@ -108,7 +108,12 @@ const PosterGenerator = () => {
         if (result.task_status === "SUCCEEDED") {
           if (result.render_urls && result.render_urls.length > 0) {
             // Set the new task result without clearing previous results
-            setTaskResult(result);
+            // Add wh_ratios to the result
+            const resultWithRatios = {
+              ...result,
+              wh_ratios: whRatios
+            };
+            setTaskResult(resultWithRatios);
             setIsSubmitting(false);
             setIsFirstGeneration(false);
             toast.success("海报生成成功");

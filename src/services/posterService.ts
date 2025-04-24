@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -9,7 +8,7 @@ export interface PosterGenerationParams {
   body_text?: string;
   prompt_text_zh?: string;
   prompt_text_en?: string;
-  wh_ratios: "横版" | "竖版";
+  wh_ratios: "16:9" | "9:16";  // Changed from "横版" | "竖版"
   lora_name?: string;
   lora_weight?: number;
   ctrl_ratio?: number;
@@ -17,11 +16,6 @@ export interface PosterGenerationParams {
   generate_mode: "generate" | "sr" | "hrf";
   generate_num?: number;
   auxiliary_parameters?: string;
-}
-
-export interface PosterGenerationResponse {
-  task_id: string;
-  task_status: "PENDING" | "RUNNING" | "SUSPENDED" | "SUCCEEDED" | "FAILED";
 }
 
 export interface PosterTaskResult {
@@ -35,6 +29,7 @@ export interface PosterTaskResult {
   end_time?: string;
   code?: string;
   message?: string;
+  wh_ratios?: "16:9" | "9:16";  // Added this property to match what's used in the component
 }
 
 // API key storage

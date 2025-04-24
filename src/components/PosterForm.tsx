@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,7 +43,7 @@ const PosterForm = ({ onSubmit, isSubmitting, isFirstGeneration }: PosterFormPro
     sub_title: "家庭团聚，共享天伦之乐",
     body_text: "春节是中国最重要的传统节日之一，它象征着新的开始和希望",
     prompt_text_zh: "灯笼，小猫，梅花",
-    wh_ratios: "9:16",
+    wh_ratios: "9:16", // This will now match the updated type
     lora_name: "童话油画",
     lora_weight: 0.8,
     ctrl_ratio: 0.7,

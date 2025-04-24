@@ -110,6 +110,8 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
     setPreviewImage(null);
   };
 
+  const isLandscape = (whRatios?: string) => whRatios === "16:9";
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
@@ -175,7 +177,7 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
             onDoubleClick={(e) => handleImagePreview(imageUrl, e)}
           >
             {imageErrors[imageUrl] ? (
-              <div className={`w-full ${taskResult?.wh_ratios === "16:9" ? "aspect-video" : "aspect-[9/16]"} bg-gray-200 flex flex-col items-center justify-center p-4 text-center`}>
+              <div className={`w-full ${isLandscape(taskResult?.wh_ratios) ? "aspect-video" : "aspect-[9/16]"} bg-gray-200 flex flex-col items-center justify-center p-4 text-center`}>
                 <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
                 <p className="text-sm text-gray-600">图片加载失败</p>
                 <Button 
@@ -192,7 +194,7 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
                 </Button>
               </div>
             ) : (
-              <div className={`relative w-full ${taskResult?.wh_ratios === "16:9" ? "aspect-video" : "aspect-[9/16]"}`}>
+              <div className={`relative w-full ${isLandscape(taskResult?.wh_ratios) ? "aspect-video" : "aspect-[9/16]"}`}>
                 {loadingImages[imageUrl] && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
                     <div className="loading-spinner"></div>
@@ -248,7 +250,7 @@ const PosterResults = ({ taskResult, isLoading, error }: PosterResultsProps) => 
           </DialogClose>
           
           {previewImage && (
-            <div className={`relative w-full ${taskResult?.wh_ratios === "16:9" ? "max-h-[60vh]" : "max-h-[80vh]"} overflow-hidden flex items-center justify-center`}>
+            <div className={`relative w-full ${isLandscape(taskResult?.wh_ratios) ? "max-h-[60vh]" : "max-h-[80vh]"} overflow-hidden flex items-center justify-center`}>
               <img 
                 src={previewImage} 
                 alt="海报预览"
