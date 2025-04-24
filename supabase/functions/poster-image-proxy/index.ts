@@ -34,7 +34,7 @@ serve(async (req) => {
     // Fetch the image from the remote server
     const imageResponse = await fetch(secureUrl, {
       headers: {
-        'Accept': 'image/jpeg, image/png, image/webp, image/*',
+        'Accept': 'image/*',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       },
     });
@@ -44,11 +44,25 @@ serve(async (req) => {
       throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
     }
 
-    // Get the image data
+    // Log response headers for debugging
+    console.log('Original response headers:', Object.fromEntries(imageResponse.headers.entries()));
+    
+    // Get the image data as ArrayBuffer
     const imageData = await imageResponse.arrayBuffer();
     const contentType = imageResponse.headers.get('Content-Type') || 'application/octet-stream';
     
-    console.log(`Successfully fetched image, size: ${imageData.byteLength} bytes, type: ${contentType}`);
+    // Validate content type and data
+    if (!contentType.startsWith('image/')) {
+      console.error(`Invalid content type received: ${contentType}`);
+      throw new Error('Invalid content type received from source');
+    }
+
+    if (imageData.byteLength === 0) {
+      console.error('Received empty image data');
+      throw new Error('Received empty image data from source');
+    }
+
+    console.log(`Successfully fetched image: size=${imageData.byteLength} bytes, type=${contentType}`);
     
     // Return the binary data directly with proper headers
     return new Response(imageData, {

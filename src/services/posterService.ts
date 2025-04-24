@@ -238,7 +238,7 @@ export const downloadImage = async (imageUrl: string, fileName: string) => {
     // For non-local images, use our proxy edge function
     console.log("Using proxy to download image");
     
-    const { data, error } = await supabase.functions.invoke('poster-image-proxy', {
+    const { data: responseData, error } = await supabase.functions.invoke('poster-image-proxy', {
       body: { imageUrl }
     });
     
@@ -247,10 +247,18 @@ export const downloadImage = async (imageUrl: string, fileName: string) => {
       throw new Error(`代理服务器错误: ${error.message}`);
     }
 
-    // Convert response to Blob
-    const blob = new Blob([data], { type: 'image/png' });
+    // Validate the response data
+    if (!(responseData instanceof ArrayBuffer)) {
+      console.error("Invalid response data type:", typeof responseData);
+      throw new Error("代理返回了无效的数据格式");
+    }
+
+    // Create a blob from the ArrayBuffer with the correct content type
+    const blob = new Blob([responseData]);
+    
+    // Validate the blob
     if (blob.size === 0) {
-      throw new Error("Downloaded image is empty");
+      throw new Error("下载的图片数据为空");
     }
 
     // Trigger the download
@@ -259,8 +267,22 @@ export const downloadImage = async (imageUrl: string, fileName: string) => {
 
   } catch (error) {
     console.error("Error downloading image:", error);
-    toast.error(`下载图片失败: ${error instanceof Error ? error.message : "未知错误"}`);
-    throw error;
+    
+    // Try direct download as fallback
+    try {
+      console.log("Attempting direct download as last resort");
+      const response = await fetch(imageUrl, { mode: 'no-cors' });
+      const blob = await response.blob();
+      if (blob.size === 0) {
+        throw new Error("下载的图片数据为空");
+      }
+      triggerDownload(blob, fileName);
+      toast.success(`图片 ${fileName} 下载成功（直接下载）`);
+    } catch (fallbackError) {
+      console.error("All download methods failed:", fallbackError);
+      toast.error(`下载图片失败: ${error instanceof Error ? error.message : "未知错误"}`);
+      throw error;
+    }
   }
 };
 
