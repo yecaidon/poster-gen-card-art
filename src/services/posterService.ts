@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -8,7 +9,7 @@ export interface PosterGenerationParams {
   body_text?: string;
   prompt_text_zh?: string;
   prompt_text_en?: string;
-  wh_ratios: "16:9" | "9:16";  // Changed from "横版" | "竖版"
+  wh_ratios: "16:9" | "9:16";  // This is what we use in the UI
   lora_name?: string;
   lora_weight?: number;
   ctrl_ratio?: number;
@@ -18,6 +19,7 @@ export interface PosterGenerationParams {
   auxiliary_parameters?: string;
 }
 
+// API response interface
 export interface PosterTaskResult {
   task_id: string;
   task_status: "PENDING" | "RUNNING" | "SUSPENDED" | "SUCCEEDED" | "FAILED";
@@ -31,6 +33,11 @@ export interface PosterTaskResult {
   message?: string;
   wh_ratios?: "16:9" | "9:16";  // Added this property to match what's used in the component
 }
+
+// Helper function to convert UI aspect ratio to API expected value
+const convertAspectRatio = (uiRatio: "16:9" | "9:16"): "横版" | "竖版" => {
+  return uiRatio === "16:9" ? "横版" : "竖版";
+};
 
 // API key storage
 let apiKey = "";
@@ -66,7 +73,7 @@ const isDevelopment = import.meta.env.DEV;
 // Function to create a poster generation task using our Supabase Edge Function
 export const createPosterTask = async (
   params: PosterGenerationParams
-): Promise<PosterGenerationResponse> => {
+): Promise<PosterTaskResult> => {
   if (!apiKey) {
     toast.error("API 密钥未设置，请设置 API 密钥后重试");
     throw new Error("API key is not set");
@@ -74,6 +81,14 @@ export const createPosterTask = async (
 
   try {
     console.log("Creating poster task with params:", params);
+    
+    // Convert our UI aspect ratio to what the API expects
+    const apiParams = {
+      ...params,
+      wh_ratios: convertAspectRatio(params.wh_ratios)
+    };
+    
+    console.log("Converted API params:", apiParams);
     
     if (isDevelopment) {
       // Create a mock task ID for development
@@ -92,7 +107,7 @@ export const createPosterTask = async (
       const { data, error } = await supabase.functions.invoke('poster-generation', {
         body: {
           apiKey,
-          params
+          params: apiParams // Use converted params
         }
       });
       

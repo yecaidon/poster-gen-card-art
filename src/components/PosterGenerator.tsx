@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import PosterForm from "./PosterForm";
 import PosterResults from "./PosterResults";
@@ -24,16 +23,13 @@ const PosterGenerator = () => {
   const [pollingId, setPollingId] = useState<number | null>(null);
 
   useEffect(() => {
-    // Check if API key is already set
     const apiKey = getPosterApiKey();
     if (apiKey) {
       setIsApiKeySet(true);
     }
 
-    // Check connectivity to Alipay CDN
     checkConnectivity();
     
-    // Cleanup polling on component unmount
     return () => {
       if (pollingId !== null) {
         clearTimeout(pollingId);
@@ -41,13 +37,11 @@ const PosterGenerator = () => {
     };
   }, [pollingId]);
 
-  // Function to check if external resources can be loaded
   const checkConnectivity = async () => {
     try {
       const testUrl = "https://mdn.alipayobjects.com/huamei_rcfvwt/afts/img/A*NZuwQp_vcH0AAAAAAAAAAAAADtmcAQ/fmt.webp";
       await fetch(testUrl, { method: 'HEAD', mode: 'no-cors' });
       
-      // If we get here, the resource is likely accessible
       setConnectivityError(null);
     } catch (err) {
       console.error("Connectivity test failed:", err);
@@ -66,12 +60,10 @@ const PosterGenerator = () => {
     try {
       console.log("Submitting poster generation with params:", params);
       
-      // Create a task using the API
       const taskResponse = await createPosterTask(params);
       
       if (taskResponse.task_id) {
         console.log("Task created successfully with ID:", taskResponse.task_id);
-        // Start polling for the task result
         pollTaskResult(taskResponse.task_id, params.wh_ratios);
       } else {
         throw new Error("未获取到任务ID");
@@ -86,8 +78,8 @@ const PosterGenerator = () => {
 
   const pollTaskResult = async (taskId: string, whRatios: "16:9" | "9:16") => {
     let retryCount = 0;
-    const maxRetries = 30; // Increased for longer running tasks
-    const pollInterval = 3000; // 3 seconds
+    const maxRetries = 30;
+    const pollInterval = 3000;
     
     const poll = async () => {
       if (retryCount >= maxRetries) {
@@ -100,15 +92,12 @@ const PosterGenerator = () => {
       try {
         console.log(`Polling task result (attempt ${retryCount + 1}/${maxRetries})`);
         
-        // Get the task result from the API
         const result = await getPosterTaskResult(taskId);
         
         console.log("Task result:", result);
         
         if (result.task_status === "SUCCEEDED") {
           if (result.render_urls && result.render_urls.length > 0) {
-            // Set the new task result without clearing previous results
-            // Add wh_ratios to the result
             const resultWithRatios = {
               ...result,
               wh_ratios: whRatios
@@ -125,13 +114,11 @@ const PosterGenerator = () => {
           setIsSubmitting(false);
           setError(result.message || "任务执行失败");
         } else if (["PENDING", "RUNNING", "SUSPENDED"].includes(result.task_status)) {
-          // Task is still running, poll again after a delay
           console.log(`Task is still ${result.task_status}, polling again in ${pollInterval}ms`);
           retryCount++;
           const timeoutId = setTimeout(poll, pollInterval);
           setPollingId(Number(timeoutId));
         } else {
-          // Handle unexpected status
           toast.error(`生成海报失败: 未预期的任务状态 ${result.task_status}`);
           setIsSubmitting(false);
           setError(`未预期的任务状态: ${result.task_status}`);
@@ -139,7 +126,6 @@ const PosterGenerator = () => {
       } catch (error) {
         console.error("Error polling task result:", error);
         
-        // Don't immediately fail - retry a few times first
         if (retryCount < 3) {
           retryCount++;
           const timeoutId = setTimeout(poll, pollInterval);
